@@ -1,0 +1,164 @@
+name: Ekbasis experiment
+description: >-
+  Give a pull request alternate futures: run the Ekbasis experiments of this repository (baseline
+  measured at the base commit, experiment measured at the PR head) and post the measured result.
+author: Ekbasis
+
+inputs:
+  ekbasis-path:
+    description: Path to an Ekbasis checkout (the tool, not the project under test).
+    required: false
+    default: ''
+  ekbasis-binary:
+    description: Path to a prebuilt `ekbasis` binary; when empty, Ekbasis is built from `ekbasis-path`.
+    required: false
+    default: ''
+  experiments:
+    description: Space separated experiment names, or `all` for every spec in `.ekbasis/experiments` (or `.aion/experiments`).
+    required: false
+    default: all
+  base-ref:
+    description: Ref measured as the baseline (usually the pull request base commit).
+    required: false
+    default: ''
+  candidate-ref:
+    description: Ref measured as the experiment (usually the pull request head commit).
+    required: false
+    default: ''
+  iterations:
+    description: Measured iterations per side.
+    required: false
+    default: '5'
+  warmup:
+    description: Discarded warm-up iterations per side.
+    required: false
+    default: '1'
+  fail-on-regression:
+    description: Fail the job when the primary metric of an experiment regresses.
+    required: false
+    default: 'false'
+  comment:
+    description: 'Post or update the pull request comment (needs `pull-requests: write`).'
+    required: false
+    default: 'true'
+  artifact-name:
+    description: Name of the uploaded artifact with the JSON/Markdown results.
+    required: false
+    default: ekbasis-results
+  retention-days:
+    description: Artifact retention in days.
+    required: false
+    default: '14'
+
+outputs:
+  result:
+    description: Path of the directory that holds the results.
+    value: ${{ steps.report.outputs.results }}
+  summary:
+    description: Path of the Markdown summary written for the step summary.
+    value: ${{ steps.report.outputs.summary }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install Rust
+      if: inputs.ekbasis-binary == ''
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache the Ekbasis build
+      if: inputs.ekbasis-binary == ''
+      uses: actions/cache@v4
+      with:
+        path: ${{ inputs.ekbasis-path }}/target
+        key: ekbasis-cli-${{ runner.os }}-${{ hashFiles(format('{0}/Cargo.lock', inputs.ekbasis-path)) }}
+        restore-keys: ekbasis-cli-${{ runner.os }}-
+
+    - name: Build the Ekbasis CLI
+      id: build
+      if: inputs.ekbasis-binary == ''
+      shell: bash
+      run: |
+        set -euo pipefail
+        cargo build --release --manifest-path "${{ inputs.ekbasis-path }}/Cargo.toml" -p ekbasis-cli
+        binary="${{ inputs.ekbasis-path }}/target/release/ekbasis"
+        if [ -f "${binary}.exe" ]; then binary="${binary}.exe"; fi
+        echo "binary=${binary}" >> "$GITHUB_OUTPUT"
+
+    - name: Install Ekbasis into the repository under test
+      shell: bash
+      run: |
+        set -euo pipefail
+        EKBASIS="${{ inputs.ekbasis-binary }}"
+        if [ -z "${EKBASIS}" ]; then EKBASIS='${{ steps.build.outputs.binary }}'; fi
+        echo "EKBASIS_BIN=${EKBASIS}" >> "$GITHUB_ENV"
+        if [ ! -f .ekbasis/config.yaml ] && [ ! -f .aion/config.yaml ]; then
+          "${EKBASIS}" init
+        else
+          echo "Ekbasis is already initialised in this repository"
+        fi
+
+    - name: Run the experiments
+      shell: bash
+      run: |
+        set -euo pipefail
+        base='${{ inputs.base-ref }}'
+        candidate='${{ inputs.candidate-ref }}'
+        extra=()
+        if [ -n "${base}" ]; then extra+=("--base" "${base}"); fi
+        if [ -n "${candidate}" ]; then extra+=("--candidate" "${candidate}"); fi
+        if [ '${{ inputs.fail-on-regression }}' = 'true' ]; then extra+=("--fail-on-regression"); fi
+
+        names='${{ inputs.experiments }}'
+        if [ "${names}" = 'all' ]; then
+          "${EKBASIS_BIN}" experiment run --all \
+            --iterations '${{ inputs.iterations }}' --warmup '${{ inputs.warmup }}' "${extra[@]}"
+        else
+          for name in ${names}; do
+            "${EKBASIS_BIN}" experiment run "${name}" \
+              --iterations '${{ inputs.iterations }}' --warmup '${{ inputs.warmup }}' "${extra[@]}"
+          done
+        fi
+
+    - name: Write the reports
+      id: report
+      shell: bash
+      run: |
+        set -euo pipefail
+        results_dir=".ekbasis/results"
+        if [ ! -d "${results_dir}" ] && [ -d ".aion/results" ]; then
+          results_dir=".aion/results"
+        fi
+        mkdir -p "${results_dir}"
+        names='${{ inputs.experiments }}'
+        if [ "${names}" = 'all' ]; then names='--all'; fi
+        "${EKBASIS_BIN}" report ${names} --format markdown --out "${results_dir}/ekbasis-summary.md"
+        "${EKBASIS_BIN}" report ${names} --format comment --out "${results_dir}/ekbasis-comment.md"
+        echo "results=${results_dir}" >> "$GITHUB_OUTPUT"
+        echo "summary=${results_dir}/ekbasis-summary.md" >> "$GITHUB_OUTPUT"
+        cat "${results_dir}/ekbasis-summary.md" >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Upload the results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ steps.report.outputs.results }}
+        retention-days: ${{ inputs.retention-days }}
+        if-no-files-found: warn
+
+    - name: Comment on the pull request
+      if: inputs.comment == 'true' && github.event_name == 'pull_request'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+        results_dir="${{ steps.report.outputs.results }}"
+        comment_file="${results_dir}/ekbasis-comment.md"
+        if [ ! -s "${comment_file}" ]; then
+          echo "no comment body was produced"
+          exit 0
+        fi
+        gh pr comment "${{ github.event.pull_request.number }}" \
+          --edit-last --create-if-none \
+          --body-file "${comment_file}"

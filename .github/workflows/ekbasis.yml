@@ -1,0 +1,47 @@
+# Example workflow: measure the Ekbasis experiments of a pull request and post the result.
+#
+# Copy this file into `.github/workflows/` of the repository you want to measure. Ekbasis itself is
+# checked out next to the project under test; the action builds the CLI from source unless you
+# provide a prebuilt binary via `ekbasis-binary`.
+name: Ekbasis experiments
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write   # needed to post or update the result comment
+
+concurrency:
+  group: ekbasis-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  ekbasis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      # The project under test. Full history, so Ekbasis can resolve the base commit and diff it.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Ekbasis itself, next to the project.
+      - uses: actions/checkout@v4
+        with:
+          repository: ekbasis/ekbasis     # <- point this at your Ekbasis checkout
+          path: .ekbasis-toolchain
+          fetch-depth: 1
+
+      - name: Run Ekbasis
+        uses: ./.ekbasis-toolchain/.github/actions/ekbasis
+        with:
+          ekbasis-path: .ekbasis-toolchain
+          experiments: all               # or "bloom-startup-test service-startup-test"
+          base-ref: ${{ github.event.pull_request.base.sha }}
+          candidate-ref: ${{ github.event.pull_request.head.sha }}
+          iterations: '5'
+          warmup: '1'
+          fail-on-regression: 'false'    # set to 'true' to fail the job on a regression
+          comment: 'true'

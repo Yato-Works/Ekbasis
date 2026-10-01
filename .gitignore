@@ -1,0 +1,22 @@
+# Rust
+/target
+**/*.rs.bk
+
+# Ekbasis experiment database, worktrees and results
+.ekbasis/
+.aion/
+
+# Editors / OS
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+
+# Scratch files from the end-to-end script
+e2e-out.txt
+e2e-err.txt
+tests-out.txt
+tests-err.txt
+
+# Planning / Notes
+Plan.md

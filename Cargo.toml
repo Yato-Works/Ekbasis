@@ -1,0 +1,43 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/ekbasis-core",
+    "crates/ekbasis-git",
+    "crates/ekbasis-runner",
+    "crates/ekbasis-observer",
+    "crates/ekbasis-benchmark",
+    "crates/ekbasis-storage",
+    "crates/ekbasis-cli",
+]
+exclude = ["examples/rust-project"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+authors = ["Ekbasis contributors"]
+description = "Ekbasis - Software Timeline & Counterfactual Experiment Engine"
+repository = "https://github.com/ekbasis/ekbasis"
+
+[workspace.dependencies]
+ekbasis-core = { path = "crates/ekbasis-core", version = "0.1.0" }
+ekbasis-git = { path = "crates/ekbasis-git", version = "0.1.0" }
+ekbasis-runner = { path = "crates/ekbasis-runner", version = "0.1.0" }
+ekbasis-observer = { path = "crates/ekbasis-observer", version = "0.1.0" }
+ekbasis-benchmark = { path = "crates/ekbasis-benchmark", version = "0.1.0" }
+ekbasis-storage = { path = "crates/ekbasis-storage", version = "0.1.0" }
+
+anyhow = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
+clap = { version = "4", features = ["derive"] }
+rusqlite = { version = "0.40", default-features = false, features = ["bundled", "cache"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+serde_yaml_ng = "0.10"
+sysinfo = { version = "0.39", default-features = false, features = ["system", "component", "disk"] }
+toml_edit = "0.25"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

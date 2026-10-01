@@ -1,0 +1,13 @@
+[package]
+name = "ekbasis-runner"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Sandboxed command execution with timeouts, output capture and observation"
+repository.workspace = true
+
+[dependencies]
+ekbasis-core.workspace = true
+ekbasis-observer.workspace = true
+anyhow.workspace = true

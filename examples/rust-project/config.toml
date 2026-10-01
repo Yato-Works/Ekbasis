@@ -1,0 +1,13 @@
+# bloom demo configuration (valid TOML, read by the tiny parser in src/main.rs)
+
+[startup]
+preload = true          # load the warm cache before reporting ready
+preload_entries = 30
+preload_entry_ms = 4
+init_ms = 60
+
+[worker]
+threads = 4
+
+[cache]
+size_mb = 256

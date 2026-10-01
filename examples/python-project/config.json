@@ -1,0 +1,14 @@
+{
+  "startup": {
+    "preload": true,
+    "preload_entries": 30,
+    "preload_entry_ms": 4,
+    "init_ms": 60
+  },
+  "worker": {
+    "threads": 4
+  },
+  "cache": {
+    "size_mb": 256
+  }
+}

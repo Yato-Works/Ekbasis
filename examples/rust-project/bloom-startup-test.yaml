@@ -1,0 +1,41 @@
+# AION experiment: what if bloom started without preloading its cache?
+#
+# Use it from the repository root of this project:
+#
+#   aion init
+#   aion experiment create bloom-startup-test --from examples/bloom-startup-test.yaml
+#   aion experiment run bloom-startup-test
+#
+# On Unix replace `command.run` with `./target/release/bloom`.
+
+experiment:
+  name: bloom-startup-test
+  base: main
+  description: "skip the cache preload and measure what startup really costs"
+  hypothesis: "startup gets faster; cache misses are not measured by this experiment"
+  tags: [startup, cache]
+
+changes:
+  - type: config
+    file: config.toml
+    key: startup.preload
+    from: true
+    to: false
+
+environment:
+  BLOOM_WORKERS: "4"
+
+command:
+  build: cargo build --release
+  test: cargo test --release
+  run: target/release/bloom.exe
+
+benchmark:
+  iterations: 5
+  warmup: 1
+  regression_threshold_percent: 3.0
+
+limits:
+  timeout_secs: 180
+  max_output_kb: 64
+  clean_env: false

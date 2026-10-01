@@ -1,0 +1,13 @@
+[package]
+name = "ekbasis-observer"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Hardware / runtime observer: machine metadata and CPU/RAM sampling"
+repository.workspace = true
+
+[dependencies]
+ekbasis-core.workspace = true
+anyhow.workspace = true
+sysinfo.workspace = true

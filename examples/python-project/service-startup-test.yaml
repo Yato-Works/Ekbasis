@@ -1,0 +1,31 @@
+# AION experiment: what if the Python service skipped its cache preload?
+#
+#   aion init
+#   aion experiment create service-startup-test --from service-startup-test.yaml
+#   aion experiment run service-startup-test
+
+experiment:
+  name: service-startup-test
+  base: main
+  description: "skip the cache preload and measure startup"
+  hypothesis: "startup gets faster"
+
+changes:
+  - type: config
+    file: config.json
+    key: startup.preload
+    from: true
+    to: false
+
+command:
+  run: python main.py
+
+benchmark:
+  iterations: 5
+  warmup: 1
+  regression_threshold_percent: 3.0
+
+limits:
+  timeout_secs: 120
+  max_output_kb: 64
+  clean_env: false

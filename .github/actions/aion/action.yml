@@ -1,0 +1,158 @@
+name: AION experiment
+description: >-
+  Give a pull request alternate futures: run the AION experiments of this repository (baseline
+  measured at the base commit, experiment measured at the PR head) and post the measured result.
+author: AION
+
+inputs:
+  aion-path:
+    description: Path to an AION checkout (the tool, not the project under test).
+    required: false
+    default: ''
+  aion-binary:
+    description: Path to a prebuilt `aion` binary; when empty, AION is built from `aion-path`.
+    required: false
+    default: ''
+  experiments:
+    description: Space separated experiment names, or `all` for every spec in `.aion/experiments`.
+    required: false
+    default: all
+  base-ref:
+    description: Ref measured as the baseline (usually the pull request base commit).
+    required: false
+    default: ''
+  candidate-ref:
+    description: Ref measured as the experiment (usually the pull request head commit).
+    required: false
+    default: ''
+  iterations:
+    description: Measured iterations per side.
+    required: false
+    default: '5'
+  warmup:
+    description: Discarded warm-up iterations per side.
+    required: false
+    default: '1'
+  fail-on-regression:
+    description: Fail the job when the primary metric of an experiment regresses.
+    required: false
+    default: 'false'
+  comment:
+    description: 'Post or update the pull request comment (needs `pull-requests: write`).'
+    required: false
+    default: 'true'
+  artifact-name:
+    description: Name of the uploaded artifact with the JSON/Markdown results.
+    required: false
+    default: aion-results
+  retention-days:
+    description: Artifact retention in days.
+    required: false
+    default: '14'
+
+outputs:
+  result:
+    description: Path of the directory that holds the results.
+    value: ${{ steps.report.outputs.results }}
+  summary:
+    description: Path of the Markdown summary written for the step summary.
+    value: ${{ steps.report.outputs.summary }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install Rust
+      if: inputs.aion-binary == ''
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache the AION build
+      if: inputs.aion-binary == ''
+      uses: actions/cache@v4
+      with:
+        path: ${{ inputs.aion-path }}/target
+        key: aion-cli-${{ runner.os }}-${{ hashFiles(format('{0}/Cargo.lock', inputs.aion-path)) }}
+        restore-keys: aion-cli-${{ runner.os }}-
+
+    - name: Build the AION CLI
+      id: build
+      if: inputs.aion-binary == ''
+      shell: bash
+      run: |
+        set -euo pipefail
+        cargo build --release --manifest-path "${{ inputs.aion-path }}/Cargo.toml" -p aion-cli
+        binary="${{ inputs.aion-path }}/target/release/aion"
+        if [ -f "${binary}.exe" ]; then binary="${binary}.exe"; fi
+        echo "binary=${binary}" >> "$GITHUB_OUTPUT"
+
+    - name: Install AION into the repository under test
+      shell: bash
+      run: |
+        set -euo pipefail
+        AION="${{ inputs.aion-binary }}"
+        if [ -z "${AION}" ]; then AION='${{ steps.build.outputs.binary }}'; fi
+        echo "AION_BIN=${AION}" >> "$GITHUB_ENV"
+        if [ ! -f .aion/config.yaml ]; then
+          "${AION}" init
+        else
+          echo "AION is already initialised in this repository"
+        fi
+
+    - name: Run the experiments
+      shell: bash
+      run: |
+        set -euo pipefail
+        base='${{ inputs.base-ref }}'
+        candidate='${{ inputs.candidate-ref }}'
+        extra=()
+        if [ -n "${base}" ]; then extra+=("--base" "${base}"); fi
+        if [ -n "${candidate}" ]; then extra+=("--candidate" "${candidate}"); fi
+        if [ '${{ inputs.fail-on-regression }}' = 'true' ]; then extra+=("--fail-on-regression"); fi
+
+        names='${{ inputs.experiments }}'
+        if [ "${names}" = 'all' ]; then
+          "${AION_BIN}" experiment run --all \
+            --iterations '${{ inputs.iterations }}' --warmup '${{ inputs.warmup }}' "${extra[@]}"
+        else
+          for name in ${names}; do
+            "${AION_BIN}" experiment run "${name}" \
+              --iterations '${{ inputs.iterations }}' --warmup '${{ inputs.warmup }}' "${extra[@]}"
+          done
+        fi
+
+    - name: Write the reports
+      id: report
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p .aion/results
+        names='${{ inputs.experiments }}'
+        if [ "${names}" = 'all' ]; then names='--all'; fi
+        "${AION_BIN}" report ${names} --format markdown --out .aion/results/aion-summary.md
+        "${AION_BIN}" report ${names} --format comment --out .aion/results/aion-comment.md
+        echo "results=.aion/results" >> "$GITHUB_OUTPUT"
+        echo "summary=.aion/results/aion-summary.md" >> "$GITHUB_OUTPUT"
+        cat .aion/results/aion-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Upload the results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: .aion/results
+        retention-days: ${{ inputs.retention-days }}
+        if-no-files-found: warn
+
+    - name: Comment on the pull request
+      if: inputs.comment == 'true' && github.event_name == 'pull_request'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+        if [ ! -s .aion/results/aion-comment.md ]; then
+          echo "no comment body was produced"
+          exit 0
+        fi
+        gh pr comment "${{ github.event.pull_request.number }}" \
+          --edit-last --create-if-none \
+          --body-file .aion/results/aion-comment.md

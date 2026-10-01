@@ -1,0 +1,14 @@
+[package]
+name = "bloom-demo"
+version = "0.1.0"
+edition = "2021"
+
+# AION example project: standalone on purpose, so it can be copied into a scratch
+# repository and used as an experiment target.
+[workspace]
+
+[[bin]]
+name = "bloom"
+path = "src/main.rs"
+
+[dependencies]

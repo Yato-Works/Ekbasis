@@ -1,0 +1,35 @@
+[package]
+name = "ekbasis-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Ekbasis command line interface"
+repository.workspace = true
+default-run = "ekbasis"
+
+[lib]
+name = "ekbasis_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ekbasis"
+path = "src/bin/ekbasis.rs"
+
+[[bin]]
+name = "aion"
+path = "src/bin/aion.rs"
+
+[dependencies]
+ekbasis-benchmark.workspace = true
+ekbasis-core.workspace = true
+ekbasis-git.workspace = true
+ekbasis-observer.workspace = true
+ekbasis-runner.workspace = true
+ekbasis-storage.workspace = true
+anyhow.workspace = true
+chrono = { workspace = true }
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml_ng.workspace = true
