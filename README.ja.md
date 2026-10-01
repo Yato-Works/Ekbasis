@@ -8,13 +8,13 @@
   <a href="https://github.com/Yato-Works/Ekbasis/actions/workflows/ekbasis.yml"><img src="https://github.com/Yato-Works/Ekbasis/actions/workflows/ekbasis.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
   <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Rust-1.85%2B-orange.svg" alt="Rust 1.85+"></a>
-  <img src="https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg" alt="Platform: Linux | macOS | Windows">
+  <a href="https://github.com/Yato-Works/Ekbasis/releases"><img src="https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg" alt="Platform: Linux | macOS | Windows"></a>
 </p>
 
 > **Git tells you how your software changed. Ekbasis lets you test what it could become.**
 >
 > Gitはソフトウェアが「どう変わったか」の歴史的事実を記録する。  
-> **Ekbasis**（エグバシス / 古代ギリシャ語: *ἔκバシス* — 帰結・結果・出口）は、「もしこの変更を入れていたらどうなっていたか？」という**反事実（Counterfactual）**を推測せず、実際に分岐・ミューテーション適用・ビルド・実行・観測・統計検証する自動実験エンジンです。
+> **Ekbasis**（エグバシス / 古代ギリシャ語: *ἔκβασις* — 帰結・結果・出口）は、「もしこの変更を入れていたらどうなっていたか？」という**反事実（Counterfactual）**を推測せず、実際に分岐・ミューテーション適用・ビルド・実行・観測・統計検証する自動実験エンジンです。
 
 ```text
 main (Commit 8f4c21a)
@@ -27,7 +27,7 @@ main (Commit 8f4c21a)
 ```
 
 **Prediction ❌ 「この変更を入れたら、たぶん速くなるはずだ」**  
-**Execution ✅ 「同一マシン・同一条件下で実行し、Welchのt検定（p < 0.001, 95%信頼区間 [-72.9ms, -67.7ms]）により有意に38.5%高速化を実証」**
+**Execution ✅ 「同一マシン・同一条件下で実行し、Welchのt検定（p < 0.001, 95%信頼区間 [-72.9ms, -67.7ms]）により有意な38.5%高速化を確認（Confirm）」**
 
 ---
 
@@ -47,13 +47,25 @@ main (Commit 8f4c21a)
 | **実験台帳の永続化** | ❌ 端末ログが流れて過去の検証データが消失 | ❌ その場のコンソール出力のみ | **✅ 組み込み SQLite (`timeline.db`) に全コミット・全試行・全サンプルを台帳記録** |
 | **PR性能回帰テスト & CI** | ⚠️ 泥臭いCIスクリプトの自作とメンテが必要 | ❌ 外部連携機能なし | **✅ 同一ランナー両計測・Sticky PRコメント自動更新・性能回帰ビルド遮断（Gate CI）** |
 
+### 第3の比較対象との境界線（Criterion.rs や Bencher との違い）
+
+* **インプロセス・マイクロベンチマーク（`Criterion.rs`, `Google Benchmark`, `go test -bench`）との違い**:  
+  Criterion はテストハーネス内にリンクされた純粋関数をナノ秒〜マイクロ秒単位で測定するツールです。  
+  → **Ekbasis はバイナリ＆システム E2E レベルで動作します**: リリースビルドされたバイナリ全体を対象とし、専用のベンチマークコードを書くことなく、Git ブランチ間の真のエンドツーエンド性能（起動時間・メモリピーク・パイプラインスループット・常駐プロトコル）を反事実的に測定・比較します。
+* **継続的ベンチマークSaaS（`Bencher` 等）との違い**:  
+  Bencher は CI パイプラインを跨いだ長期的なメトリクスのトレンド追跡に特化したクラウド SaaS です。  
+  → **Ekbasis はローカル実行＆反事実ブランチエンジンです**: コードをマージする「前」の段階で、Git worktree の自動生成、設定やパッチの外科手術的適用、同一ランナーでの A/B 統計検定、SQLite 台帳（`timeline.db`）への永続化をすべて自律完結で行います。
+
 ---
 
 ## アーキテクチャ解説と技術的担保（Deep Dive）
 
 ### 1. ゼロオーバーヘッドの直接プロセス起動（Direct Process Execution）
 ベンチマーク対象をシェル（`sh -c` や `cmd.exe`）経由で起動すると、シェルのプロセス生成・引数展開・環境変数初期化のオーバーヘッドが混入し、サブミリ秒精度の測定値が激しく歪みます。  
-Ekbasis は **OS システムコール（`CreateProcessW` / `execve`）で対象バイナリを直接起動**します。さらに 150ms 間隔で子プロセスツリー全体を深層サンプリングし、真のピーク物理メモリ（RSS）、CPU使用率、GPU VRAM、温度をラッパーの干渉なしに正確に記録します。
+Ekbasis は **OS システムコール（`CreateProcessW` / `execve`）で対象バイナリを直接起動**します。
+
+* **ハイウォーターマーク計測（High-Watermark Accounting）**: 短命なプロセスでも、OS カーネルのプロセスメトリクス（Linux の `getrusage` / Windows の `GetProcessMemoryInfo` の `PeakWorkingSetSize`）からプロセス生涯の真のピーク物理メモリ（RSS）を直接取得。サンプリング周期の隙間に発生した瞬間スパイクも逃さず捕捉します。
+* **継続的テレメトリ（Continuous Telemetry）**: 長時間実行されるワークロードに対しては、子プロセスツリー全体を 150ms 周期で監視し、CPU使用率曲線、GPU VRAM使用量、温度ヘッドルームを時系列サンプリングします。
 
 ### 2. ASTレベルの外科手術的設定書き換え（Round-Trip Preservation）
 生の文字列置換（`type: replace` や `sed`）は、コードフォーマッタの実行やインデントの違いで容易に壊れます。  
@@ -351,6 +363,7 @@ docs/
 tests/
 ├── e2e.sh             Linux / macOS / POSIX 向けエンドツーエンド検証スクリプト
 └── e2e.ps1            Windows (PowerShell) 向けエンドツーエンド検証スクリプト
+install.sh             自動 POSIX インストーラースクリプト
 ```
 
 ---

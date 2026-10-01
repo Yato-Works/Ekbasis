@@ -8,7 +8,7 @@
   <a href="https://github.com/Yato-Works/Ekbasis/actions/workflows/ekbasis.yml"><img src="https://github.com/Yato-Works/Ekbasis/actions/workflows/ekbasis.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
   <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Rust-1.85%2B-orange.svg" alt="Rust 1.85+"></a>
-  <img src="https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg" alt="Platform: Linux | macOS | Windows">
+  <a href="https://github.com/Yato-Works/Ekbasis/releases"><img src="https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg" alt="Platform: Linux | macOS | Windows"></a>
 </p>
 
 > **Git tells you how your software changed. Ekbasis lets you test what it could become.**
@@ -27,7 +27,7 @@ main (Commit 8f4c21a)
 ```
 
 **Prediction ❌ "This change should probably make it faster."**  
-**Execution ✅ "Measured under identical machine conditions; Welch's t-test proves a statistically significant 38.5% improvement (p < 0.001, 95% CI [-72.9ms, -67.7ms])."**
+**Execution ✅ "Measured under identical machine conditions; Welch's t-test confirms a statistically significant 38.5% improvement (p < 0.001, 95% CI [-72.9ms, -67.7ms])."**
 
 ---
 
@@ -47,13 +47,25 @@ While ad-hoc scripts work for toy projects, rigorous performance engineering hit
 | **Historical Experiment Ledger** | ❌ Ephemeral stdout logs lost in terminal history | ❌ Console output only | **✅ Embedded SQLite (`timeline.db`) indexing every commit, sample, telemetry point, and run diff** |
 | **PR Regression Gate & CI** | ⚠️ Fragile homemade CI pipelines | ❌ None | **✅ Same-runner dual baseline/candidate measurement, sticky PR comment updates, and CI failure gates** |
 
+### Where Does Ekbasis Stand? (vs. Criterion.rs & Bencher)
+
+* **vs. In-Process Microbenchmarks (`Criterion.rs`, `Google Benchmark`, `Go test -bench`)**:  
+  Criterion measures isolated, nanosecond-to-microsecond in-process pure functions via custom test harnesses.  
+  → **Ekbasis operates at the binary and system E2E level**: It tests compiled release binaries, measuring end-to-end realities (startup latency, memory high-water marks, full pipeline throughput, daemon protocols) across counterfactual Git branches without requiring dedicated benchmark code harnesses.
+* **vs. Continuous Benchmarking Platforms (`Bencher`)**:  
+  Bencher is a cloud platform for tracking trends across CI pipelines over months.  
+  → **Ekbasis is the local execution & counterfactual branch engine**: It automatically creates ephemeral Git worktrees, mutates configs/patches, runs identical-runner A/B statistical comparisons, and persists local timeline ledgers (`timeline.db`) *before* code is ever merged to main.
+
 ---
 
 ## Architectural Deep Dive
 
 ### 1. Zero-Overhead Direct Process Execution
 Invoking benchmarks via shells (`sh -c` or `cmd.exe`) injects unpredictable initialization latency, environment variable parsing delays, and wrapper process noise into sub-millisecond benchmarks.  
-Ekbasis executes target binaries **directly via OS system calls** (`CreateProcessW` / `execve`). It samples the entire child process tree every 150ms to accurately capture peak resident memory (RSS), CPU utilization, GPU VRAM, and thermal headroom without wrapper distortion.
+Ekbasis executes target binaries **directly via OS system calls** (`CreateProcessW` / `execve`).
+
+* **High-Watermark Accounting**: For short-lived processes, peak resident memory (RSS) is harvested directly from OS kernel process accounting (`getrusage` / `GetProcessMemoryInfo`), capturing true lifetime peaks without missing sub-tick spikes.
+* **Continuous Telemetry**: For longer workloads, the child process tree is polled every 150ms to sample CPU utilization curves, GPU VRAM, and thermal headroom.
 
 ### 2. Surgical Round-Trip Configuration Surgery
 Ad-hoc text replacement (`type: replace` or `sed`) is brittle—formatting changes or comments can easily cause silent failures or corrupted configs.  
@@ -352,6 +364,7 @@ docs/
 tests/
 ├── e2e.sh             End-to-end integration test suite for Linux, macOS & POSIX environments
 └── e2e.ps1            End-to-end integration test suite for Windows PowerShell
+install.sh             Automated POSIX installation script
 ```
 
 ---
