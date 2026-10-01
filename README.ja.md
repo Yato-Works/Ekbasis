@@ -97,16 +97,27 @@ CI 時間とランナー費用の肥大化を防ぐため、以下の最適化�
 * **ベースライン再利用（`--no-baseline`）**: ベースコミットの計測結果が SQLite（`.ekbasis/timeline.db`）や GitHub Artifacts に保存されている場合、`--no-baseline` を指定してベースラインの再計測をスキップし、キャッシュ済みの結果と即座に比較可能。
 * **マトリクス実験での共通ベースライン**: パラメータスイープ時、ベースラインの計測は最初の1度だけ行われ、全バリアントで共有されます。
 
+### 6. 異常終了・シグナル耐性（作業ツリーの絶対保護保証）
+Git 連動自動化でエンジニアが最も警戒するのは「ベンチマーク計測中に Ctrl+C（SIGINT）を叩いた時や、OOM Killer で落ちた時に、worktree がロックされて作業ツリーが破壊されないか？」という点です。  
+Ekbasis は多重の防御層でリポジトリの安全性を保証します：
+* **完全アウトオブツリー実行**: 実験の変更適用や計測は、現在作業中のディレクトリや `HEAD` を 1ミリも触りません。すべて `.ekbasis/worktrees/<name>` 配下の独立した一時 worktree 内で完結します。
+* **自己修復と孤立ロックの自動プルーニング**: パイプライン開始前や `ekbasis doctor` 実行時、Ekbasis は Git の worktree 状態を検証し、放置された一時ディレクトリや孤立ロックを自動的に安全回収（`git worktree prune`）します。仮に `SIGKILL` 等でプロセスが蒸発しても、メインブランチの編集中のファイルやステージング状態には一切影響を及ぼしません。
+
 ---
 
 ## インストール（Installation）
 
 Ekbasis はシングルバイナリで動作し、外部ランタイム依存はありません（Git のみ必要です）。
 
-### ワンライナー導入（Linux / macOS）
-```bash
-curl -fsSL https://raw.githubusercontent.com/Yato-Works/Ekbasis/main/install.sh | sh
-```
+### ワンライナー導入
+* **Linux & macOS (Bash)**:
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/Yato-Works/Ekbasis/main/install.sh | sh
+  ```
+* **Windows (PowerShell)**:
+  ```powershell
+  irm https://raw.githubusercontent.com/Yato-Works/Ekbasis/main/install.ps1 | iex
+  ```
 
 ### Pre-built Binaries (GitHub Releases)
 Linux (x86_64, aarch64), macOS (Apple Silicon, Intel), Windows 向けのビルド済みバイナリを [GitHub Releases](https://github.com/Yato-Works/Ekbasis/releases) から直接ダウンロードできます。
@@ -364,6 +375,9 @@ tests/
 ├── e2e.sh             Linux / macOS / POSIX 向けエンドツーエンド検証スクリプト
 └── e2e.ps1            Windows (PowerShell) 向けエンドツーエンド検証スクリプト
 install.sh             自動 POSIX インストーラースクリプト
+install.ps1            自動 Windows PowerShell インストーラースクリプト
+README.md              英語メインドキュメント
+README.ja.md           日本語ドキュメント
 ```
 
 ---

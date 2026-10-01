@@ -97,16 +97,27 @@ To avoid CI cost explosion:
 * **Baseline Re-use (`--no-baseline`)**: If your base commit was already benchmarked and preserved in SQLite (`.ekbasis/timeline.db`) or as a GitHub Artifact, pass `--no-baseline` to skip re-measuring the base branch and compare directly against the cached run.
 * **Shared Matrix Baselines**: In parameter sweeps, the baseline commit is measured exactly once and shared across all $M$ permutations.
 
+### 6. Crash & Signal Safety (Isolated Worktree Guarantees)
+A critical concern in Git automation is: *"What happens if I hit Ctrl+C (SIGINT) mid-run, or if the benchmark process is killed by OOM?"*  
+Ekbasis guarantees repository safety through multi-layered isolation:
+* **Out-of-Tree Execution**: Benchmarks and mutations never touch your active working directory or `HEAD`. They run strictly in detached temporary worktrees under `.ekbasis/worktrees/<name>`.
+* **Self-Healing State & Stale Lock Pruning**: Upon initiation, before any run, and during `ekbasis doctor`, Ekbasis inspects active Git worktree records and automatically prunes stale administrative directories (`git worktree prune`) and orphaned locks. Even if killed abruptly via `SIGKILL`, your main branch, staged files, and uncommitted edits remain 100% untouched.
+
 ---
 
 ## Installation
 
 Ekbasis is distributed as a single static binary with zero external runtime dependencies (Git is required).
 
-### Quick Install (Linux & macOS)
-```bash
-curl -fsSL https://raw.githubusercontent.com/Yato-Works/Ekbasis/main/install.sh | sh
-```
+### Quick Install
+* **Linux & macOS (Bash)**:
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/Yato-Works/Ekbasis/main/install.sh | sh
+  ```
+* **Windows (PowerShell)**:
+  ```powershell
+  irm https://raw.githubusercontent.com/Yato-Works/Ekbasis/main/install.ps1 | iex
+  ```
 
 ### Pre-built Binaries (GitHub Releases)
 Download standalone binaries for Linux (x86_64, aarch64), macOS (Apple Silicon, Intel), and Windows from [GitHub Releases](https://github.com/Yato-Works/Ekbasis/releases).
@@ -365,6 +376,9 @@ tests/
 ├── e2e.sh             End-to-end integration test suite for Linux, macOS & POSIX environments
 └── e2e.ps1            End-to-end integration test suite for Windows PowerShell
 install.sh             Automated POSIX installation script
+install.ps1            Automated Windows PowerShell installation script
+README.md              Primary documentation (English)
+README.ja.md           日本語ドキュメント
 ```
 
 ---
