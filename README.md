@@ -289,7 +289,7 @@ ekbasis sweep startup-opt
 ```
 
 ### 2. Container Sandboxing (Docker / Podman)
-Execute benchmarks inside an isolated, containerized environment to guarantee hermetic repeatability and enforce network isolation (`--network none`):
+Execute benchmarks inside an isolated, containerized environment to guarantee hermetic repeatability and enforce network isolation (spec: `network: block`, translated to `--network none` by the container engine):
 
 ```yaml
 limits:
@@ -307,7 +307,7 @@ ekbasis experiment run startup-opt --container rust:1.85-slim
 Benchmark pull requests by comparing the base commit and head commit on the same CI runner:
 
 ```yaml
-      - uses: Yato-Works/Ekbasis/.github/actions/ekbasis@main
+      - uses: Yato-Works/Ekbasis/.github/actions/ekbasis@v1
         with:
           base-ref: ${{ github.event.pull_request.base.sha }}
           candidate-ref: ${{ github.event.pull_request.head.sha }}

@@ -22,7 +22,7 @@ pub fn init(args: &CiInitArgs, verbose: bool) -> Result<()> {
     std::fs::create_dir_all(&workflow_dir)
         .with_context(|| format!("cannot create `{}`", workflow_dir.display()))?;
 
-    let repo = args.repo.as_deref().unwrap_or("ekbasis/ekbasis");
+    let repo = args.repo.as_deref().unwrap_or("Yato-Works/Ekbasis");
     let experiments = args.experiments.as_deref().unwrap_or("all");
     let fail_on_regression = if args.fail_on_regression { "true" } else { "false" };
 

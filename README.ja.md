@@ -288,7 +288,7 @@ ekbasis sweep startup-opt
 ```
 
 ### 2. コンテナサンドボックス分離（Container Runner）
-Docker / Podman を利用し、ホスト環境を一切汚さずに隔離されたコンテナ内でビルド・テスト・計測を実行します。ネットワーク遮断（`--network none`）と完全な環境再現性が保証されます。
+Docker / Podman を利用し、ホスト環境を一切汚さずに隔離されたコンテナ内でビルド・テスト・計測を実行します。スペックで `network: block` を宣言すると、コンテナエンジン側で `--network none` に変換され、完全なネットワーク遮断と環境再現性が保証されます。
 
 ```yaml
 limits:
@@ -306,7 +306,7 @@ ekbasis experiment run startup-opt --container rust:1.85-slim
 PR の base commit と candidate (head) commit を**同一ランナー上で両方計測**し、結果を PR コメントとして自動投稿します。
 
 ```yaml
-      - uses: Yato-Works/Ekbasis/.github/actions/ekbasis@main
+      - uses: Yato-Works/Ekbasis/.github/actions/ekbasis@v1
         with:
           base-ref: ${{ github.event.pull_request.base.sha }}
           candidate-ref: ${{ github.event.pull_request.head.sha }}
