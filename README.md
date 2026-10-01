@@ -367,7 +367,8 @@ examples/
 └── python-project/    Sample Python application with JSON mutation benchmark
 
 .github/
-└── actions/ekbasis/   GitHub Composite Action for automated PR benchmarking
+├── actions/ekbasis/   GitHub Composite Action for automated PR benchmarking
+└── workflows/         CI pipelines and PR regression checks (ekbasis.yml)
 docs/
 ├── architecture.md    Detailed architectural design (statistical models, telemetry, process trees)
 ├── experiment-spec.md Complete YAML experiment specification reference

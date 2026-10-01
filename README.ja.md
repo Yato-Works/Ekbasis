@@ -366,7 +366,8 @@ examples/
 └── python-project/    Python 製デモプロジェクト（config.json を書き換える実験同梱）
 
 .github/
-└── actions/ekbasis/   PR 自動計測 & コメント投稿用 GitHub Composite Action
+├── actions/ekbasis/   PR 自動計測 & コメント投稿用 GitHub Composite Action
+└── workflows/         CI パイプライン＆性能回帰テスト定義（ekbasis.yml）
 docs/
 ├── architecture.md    アーキテクチャ詳細・統計モデル・テレメトリ・セキュリティ設計
 ├── experiment-spec.md 実験定義仕様リファレンス
